@@ -17,9 +17,11 @@ type HTTPServer struct {
 }
 
 func NewHTTPServer(port int) *HTTPServer {
-	return &HTTPServer{
+	server := &HTTPServer{
 		port: port,
 	}
+	server.ready.Store(false)
+	return server
 }
 
 func (s *HTTPServer) SetReady(ready bool) {
@@ -27,8 +29,13 @@ func (s *HTTPServer) SetReady(ready bool) {
 }
 
 func (s *HTTPServer) handleHealthz(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+	if s.ready.Load() {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ready"))
+	} else {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte("not ready"))
+	}
 }
 
 func (s *HTTPServer) handleReadyz(w http.ResponseWriter, r *http.Request) {
