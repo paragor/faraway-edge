@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"sort"
@@ -79,6 +80,15 @@ func (xds *XDS) initProviders(ctx context.Context) error {
 		}
 		return nil
 	}
+}
+
+func (xds *XDS) DumpCurrentSnapshot(writer io.Writer) error {
+	snap, err := xds.cacheManager.GetSnapshot("all")
+	if err != nil {
+		return err
+	}
+
+	return utils.DumpSnapshotAsJson(snap, writer)
 }
 
 func (xds *XDS) RunServer(ctx context.Context, providerStartupTimeout time.Duration, onReady func()) error {

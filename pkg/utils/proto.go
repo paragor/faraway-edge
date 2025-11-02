@@ -1,40 +1,55 @@
 package utils
 
 import (
-	"context"
 	"fmt"
-	"log/slog"
+	"io"
+	"sort"
 
 	clusterv3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	listenerv3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
-	"github.com/paragor/faraway-edge/pkg/log"
+	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func DumpSnapshotAsJson(ctx context.Context, snapshot *cache.Snapshot) {
-	logger := log.FromContext(ctx)
+func DumpSnapshotAsJson(snapshot cache.ResourceSnapshot, writer io.Writer) error {
 	opts := protojson.MarshalOptions{
 		Indent:          "  ",
 		EmitUnpopulated: false,
 	}
 
-	for _, ress := range snapshot.Resources {
-		if len(ress.Items) == 0 {
+	resourcesTypes := []string{
+		resource.EndpointType,
+		resource.ClusterType,
+		resource.RouteType,
+		resource.ScopedRouteType,
+		resource.VirtualHostType,
+		resource.ListenerType,
+		resource.SecretType,
+		resource.RuntimeType,
+		resource.ExtensionConfigType,
+		resource.RateLimitConfigType,
+	}
+	sort.Strings(resourcesTypes)
+
+	for _, key := range resourcesTypes {
+		ress := snapshot.GetResources(key)
+		if len(ress) == 0 {
 			continue
 		}
-		fmt.Println("####")
-		for name, res := range ress.Items {
-			jdata, err := opts.Marshal(res.Resource)
+		for name, res := range ress {
+			jdata, err := opts.Marshal(res)
 			if err != nil {
-				logger.Error("error marshaling resource", slog.String("name", name), log.Error(err))
-				continue
+				return fmt.Errorf("cant marshal %s: %w", name, err)
 			}
 
-			fmt.Println(string(jdata))
+			if _, err := fmt.Fprintln(writer, string(jdata)); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 //func HashSnapshot(resources map[resource.Type][]types.Resource) string {

@@ -174,6 +174,7 @@ The control plane exposes diagnostic endpoints on port 8080:
 - **`/healthz`**: Always returns healthy status
 - **`/readyz`**: Returns ready when the control plane is operational
 - **`/metrics`**: Metrics endpoint (placeholder for future implementation)
+- **`/dump`**: Dump current snapshot
 
 These endpoints can be used with container orchestration platforms, load balancers, or monitoring systems.
 

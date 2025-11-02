@@ -111,8 +111,13 @@ Example:
 			providers = append(providers, k8sProvider)
 		}
 
+		xds := envoy.NewXDS(
+			xdsPort,
+			providers,
+			token,
+		)
 		// Create HTTP server
-		httpServer := diags.NewHTTPServer(8080)
+		httpServer := diags.NewHTTPServer(8080, xds.DumpCurrentSnapshot)
 
 		// Start HTTP server in background
 		httpErrChan := make(chan error, 1)
@@ -123,11 +128,6 @@ Example:
 		}()
 
 		// Create and initialize XDS
-		xds := envoy.NewXDS(
-			xdsPort,
-			providers,
-			token,
-		)
 
 		// Start XDS server in background
 		xdsErrChan := make(chan error, 1)

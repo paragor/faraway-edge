@@ -3,6 +3,7 @@ package diags
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"sync/atomic"
@@ -12,13 +13,15 @@ import (
 )
 
 type HTTPServer struct {
-	port  int
-	ready atomic.Bool
+	port   int
+	ready  atomic.Bool
+	dumper func(io.Writer) error
 }
 
-func NewHTTPServer(port int) *HTTPServer {
+func NewHTTPServer(port int, dumper func(io.Writer) error) *HTTPServer {
 	server := &HTTPServer{
-		port: port,
+		port:   port,
+		dumper: dumper,
 	}
 	server.ready.Store(false)
 	return server
@@ -60,6 +63,13 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	mux.HandleFunc("/healthz", s.handleHealthz)
 	mux.HandleFunc("/readyz", s.handleReadyz)
 	mux.HandleFunc("/metrics", s.handleMetrics)
+	mux.HandleFunc("/dump", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		if err := s.dumper(w); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(err.Error()))
+		}
+	})
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", s.port),
