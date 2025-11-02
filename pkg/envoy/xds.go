@@ -81,7 +81,7 @@ func (xds *XDS) initProviders(ctx context.Context) error {
 	}
 }
 
-func (xds *XDS) RunServer(ctx context.Context, providerStartupTimeout time.Duration) error {
+func (xds *XDS) RunServer(ctx context.Context, providerStartupTimeout time.Duration, onReady func()) error {
 	logger := log.FromContext(ctx)
 	startupCtx, cancel := context.WithTimeout(ctx, providerStartupTimeout)
 	defer cancel()
@@ -106,6 +106,7 @@ func (xds *XDS) RunServer(ctx context.Context, providerStartupTimeout time.Durat
 			if err := xds.updateView(ctx, view); err != nil {
 				logger.Error("Error updating view", log.Error(err))
 			}
+			onReady()
 		}
 	}()
 
