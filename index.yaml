@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   faraway-edge:
   - apiVersion: v2
+    appVersion: 0.1.2
+    created: "2025-11-02T21:10:13.962071465Z"
+    description: A Helm chart for Kubernetes
+    digest: 7eb570d3e0b34bba790c7e5ae9052d0290beb93fd3b9f46b116ee5444e4fe544
+    name: faraway-edge
+    type: application
+    urls:
+    - https://github.com/paragor/faraway-edge/releases/download/faraway-edge-0.1.2-helm/faraway-edge-0.1.2.tgz
+    version: 0.1.2
+  - apiVersion: v2
     appVersion: 0.1.1
     created: "2025-11-02T21:07:37.626933638Z"
     description: A Helm chart for Kubernetes
@@ -61,4 +71,4 @@ entries:
     urls:
     - https://github.com/paragor/faraway-edge/releases/download/faraway-edge-0.0.1-helm/faraway-edge-0.0.1.tgz
     version: 0.0.1
-generated: "2025-11-02T21:07:37.626956421Z"
+generated: "2025-11-02T21:10:13.962108455Z"
