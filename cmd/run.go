@@ -9,11 +9,13 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/paragor/faraway-edge/pkg/diags"
 	"github.com/paragor/faraway-edge/pkg/envoy"
+	"github.com/paragor/faraway-edge/pkg/k8s"
 	"github.com/paragor/faraway-edge/pkg/log"
 	"github.com/spf13/cobra"
 )
@@ -40,25 +42,25 @@ Example:
 		staticPath, _ := cmd.Flags().GetString("static-path")
 		token, _ := cmd.Flags().GetString("token")
 
-		if staticPath == "" {
-			logger.Error("you should specify --static-path")
-			os.Exit(1)
-		}
-		data, err := os.ReadFile(staticPath)
-		if err != nil {
-			logger.Error("Error reading file", slog.String("path", staticPath), log.Error(err))
-			os.Exit(1)
-		}
+		providers := []envoy.LogicalClusterProvider{}
+		if staticPath != "" {
+			data, err := os.ReadFile(staticPath)
+			if err != nil {
+				logger.Error("Error reading file", slog.String("path", staticPath), log.Error(err))
+				os.Exit(1)
+			}
 
-		cluster := &envoy.LogicalCluster{}
-		if err := json.Unmarshal(data, cluster); err != nil {
-			logger.Error("Error parsing JSON", slog.String("path", staticPath), log.Error(err))
-			os.Exit(1)
-		}
+			cluster := &envoy.LogicalCluster{}
+			if err := json.Unmarshal(data, cluster); err != nil {
+				logger.Error("Error parsing JSON", slog.String("path", staticPath), log.Error(err))
+				os.Exit(1)
+			}
 
-		if err := cluster.Validate(); err != nil {
-			logger.Error("Configuration validation failed", log.Error(err))
-			os.Exit(1)
+			if err := cluster.Validate(); err != nil {
+				logger.Error("Configuration validation failed", log.Error(err))
+				os.Exit(1)
+			}
+			providers = append(providers, envoy.NewStaticLogicalClusterProvider(cluster))
 		}
 
 		// Set up signal handling
@@ -75,6 +77,40 @@ Example:
 			cancel()
 		}()
 
+		k8sProviderErrChan := make(chan error, 1)
+		k8sEnabled, _ := cmd.Flags().GetBool("k8s-enabled")
+		if k8sEnabled {
+			k8sClusterName, _ := cmd.Flags().GetString("k8s-cluster-name")
+			k8sIngressClasses, _ := cmd.Flags().GetString("k8s-ingress-classes")
+
+			ics := []string{}
+			if len(k8sIngressClasses) > 0 {
+				for _, ic := range strings.Split(k8sIngressClasses, ",") {
+					ic = strings.TrimSpace(ic)
+					if ic != "" {
+						ics = append(ics, ic)
+					}
+				}
+			}
+
+			clientset, err := k8s.NewClientset()
+			if err != nil {
+				logger.Error("Cant init k8s clientset", log.Error(err))
+				os.Exit(1)
+			}
+			k8sProvider, err := k8s.NewIngressProvider(k8sClusterName, ics, clientset, time.Hour*24)
+			if err != nil {
+				logger.Error("Cant init k8s provider", log.Error(err))
+				os.Exit(1)
+			}
+
+			go func() {
+				k8sProviderErrChan <- k8sProvider.Run(ctx)
+			}()
+
+			providers = append(providers, k8sProvider)
+		}
+
 		// Create HTTP server
 		httpServer := diags.NewHTTPServer(8080)
 
@@ -87,7 +123,11 @@ Example:
 		}()
 
 		// Create and initialize XDS
-		xds := envoy.NewXDS(xdsPort, []envoy.LogicalClusterProvider{envoy.NewStaticLogicalClusterProvider(cluster)}, token)
+		xds := envoy.NewXDS(
+			xdsPort,
+			providers,
+			token,
+		)
 
 		// Start XDS server in background
 		xdsErrChan := make(chan error, 1)
@@ -101,6 +141,11 @@ Example:
 
 		// Wait for either server to error or context cancellation
 		select {
+		case err := <-k8sProviderErrChan:
+			if err != nil {
+				logger.Error("Error running xDS server", log.Error(err))
+				os.Exit(1)
+			}
 		case err := <-xdsErrChan:
 			if err != nil {
 				logger.Error("Error running xDS server", log.Error(err))
@@ -121,6 +166,9 @@ func init() {
 	rootCmd.AddCommand(runCmd)
 
 	runCmd.Flags().Int("xds-port", 18000, "Port for XDS server")
-	runCmd.Flags().String("static-path", "", "Path to JSON file containing LogicalCluster configuration")
+	runCmd.Flags().String("static-path", "", "Path to JSON file containing LogicalCluster configuration (optional)")
 	runCmd.Flags().String("token", "", "Authentication token for gRPC xDS server (optional)")
+	runCmd.Flags().Bool("k8s-enabled", true, "Enable local k8s")
+	runCmd.Flags().String("k8s-cluster-name", "k8s-local", "K8s cluster name")
+	runCmd.Flags().String("k8s-ingress-classes", "", "k8s ingress class classes split by ,")
 }

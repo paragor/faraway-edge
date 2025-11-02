@@ -71,6 +71,8 @@ func (xds *XDS) initProviders(ctx context.Context) error {
 		view, err := xds.takeView(ctx)
 		if err != nil {
 			logger.Error("Error taking view", log.Error(err))
+			time.Sleep(1 * time.Second)
+			continue
 		}
 		if err := xds.updateView(ctx, view); err != nil {
 			return err

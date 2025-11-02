@@ -45,6 +45,23 @@ func (v *LogicalView) Validate() error {
 			return fmt.Errorf("logical_clusters[%d]: %w", i, err)
 		}
 	}
+	uniqHttpDomain := map[string]string{}
+	for _, cluster := range v.LogicalClusters {
+		for _, ingress := range cluster.Ingresses {
+			for _, config := range ingress.Frontends {
+				fullName := cluster.Name + "/" + ingress.Name + "/" + config.Domain
+				if secondName, ok := uniqHttpDomain[config.Domain]; ok {
+					return fmt.Errorf(
+						"duplicate domain name: %s. first cluster: %s, second cluster: %s",
+						config.Domain,
+						fullName,
+						secondName,
+					)
+				}
+				uniqHttpDomain[config.Domain] = fullName
+			}
+		}
+	}
 	return nil
 }
 
@@ -60,6 +77,7 @@ func (s *LogicalView) Clusters() []*clusterv3.Cluster {
 	for _, cluster := range s.LogicalClusters {
 		result = append(result, cluster.Clusters()...)
 	}
+	result = append(result, envoyBlackhole.GenerateCluster())
 	return result
 }
 
@@ -68,6 +86,7 @@ func (s *LogicalView) generateHttpsListener() *listenerv3.Listener {
 	for _, cluster := range s.LogicalClusters {
 		filters = append(filters, cluster.TLSFilters()...)
 	}
+	filters = append(filters, envoyBlackhole.GenerateFilterChain())
 
 	return &listenerv3.Listener{
 		Name: "https_listener",

@@ -25,6 +25,10 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
+rbac:
+  # Specifies whether RBAC resources should be created
+  create: true
+
 podAnnotations: {}
 podLabels: {}
 
@@ -53,6 +57,9 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/client-body-buffer-size: "1m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
   hosts:
     - host: chart-example.local
       paths:
@@ -110,9 +117,16 @@ tolerations: []
 
 affinity: {}
 
-config: {}
+config:
+  name: static
+  ingresses: []
 
-xds_auth_token: ""
+xdsAuthToken: ""
+
+k8sDiscovery:
+  enabled: true
+  clusterName: "k8s-local"
+  ingressClasses: []
 
 serviceMonitor:
   ## If true, a ServiceMonitor CR is created for a prometheus operator

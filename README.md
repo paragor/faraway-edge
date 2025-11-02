@@ -10,6 +10,7 @@ Faraway Edge acts as a central configuration server for Envoy proxy instances, a
 
 - **Dynamic Configuration**: Proxies automatically receive configuration updates without restarts
 - **Domain-Based Routing**: Route HTTP and HTTPS traffic based on domain names to different backend services
+- **Kubernetes Integration**: Automatically discover and configure routing from Kubernetes Ingress resources
 - **Automatic Configuration Sync**: Connected proxies stay synchronized with the latest routing rules
 - **Health Monitoring**: Built-in health check and readiness endpoints for integration with orchestration platforms
 - **Secure Communication**: Optional token-based authentication to secure the control plane
@@ -30,6 +31,21 @@ docker pull ghcr.io/paragor/faraway-edge:latest
 helm repo add faraway-edge https://paragor.github.io/faraway-edge
 helm install faraway-edge faraway-edge/faraway-edge
 ```
+
+**Kubernetes Configuration:**
+
+The Helm chart supports automatic Ingress discovery. Configure in `values.yaml`:
+
+```yaml
+k8sDiscovery:
+  enabled: true
+  clusterName: "k8s-local"
+  ingressClasses: []  # Empty = watch all ingress classes, or specify: ["nginx", "traefik"]
+
+xdsAuthToken: "your-secret-token"  # Optional authentication
+```
+
+The chart automatically creates RBAC permissions to watch Ingress resources cluster-wide.
 
 ### Binary
 
@@ -94,6 +110,8 @@ When using authentication, ensure your Envoy proxies include the token in their 
 
 ## Configuration
 
+### Static Configuration (JSON)
+
 Configuration files define routing rules using a JSON format. Each configuration specifies:
 
 - **HTTP and HTTPS backend services**: Where to route traffic for each protocol
@@ -101,6 +119,53 @@ Configuration files define routing rules using a JSON format. Each configuration
 - **Connection settings**: Timeouts and other connection parameters
 
 Use the `example` command to see a sample configuration structure.
+
+### Kubernetes Configuration
+
+When deployed to Kubernetes with `k8sDiscovery.enabled: true`, the control plane automatically watches Ingress resources and generates routing configurations dynamically. This eliminates the need for static JSON configuration files.
+
+**How it works:**
+
+The control plane watches all Ingress resources in the cluster and automatically configures Envoy to route traffic to the LoadBalancer IPs specified in the Ingress status.
+
+**Ingress Requirements:**
+
+An Ingress resource will be included if:
+- It has a LoadBalancer IP in `status.loadBalancer.ingress`
+- It has at least one host defined in `spec.rules`
+- It matches the configured `ingressClasses` filter (if specified)
+
+**Supported Annotations:**
+
+- `faraway-edge.paragor.net/timeout` - Connection timeout (e.g., `5s`, `10s`)
+- `nginx.ingress.kubernetes.io/server-alias` - Additional domain aliases (comma-separated)
+
+**Example Ingress:**
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    faraway-edge.paragor.net/timeout: "10s"
+    nginx.ingress.kubernetes.io/server-alias: "app.example.com, app2.example.com"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: myapp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-app
+                port:
+                  number: 80
+```
+
+The control plane will route traffic for `myapp.example.com`, `app.example.com`, and `app2.example.com` to the LoadBalancer IPs on ports 80 (HTTP) and 443 (HTTPS).
 
 ## Monitoring
 
@@ -116,13 +181,17 @@ These endpoints can be used with container orchestration platforms, load balance
 
 Faraway Edge operates as a control plane server that:
 
-1. Reads routing configuration from JSON files
-2. Validates the configuration for correctness
-3. Translates high-level routing rules into detailed proxy configurations
-4. Serves configurations to connected Envoy proxies
-5. Automatically pushes updates when configurations change
+1. **Discovers routing rules** from either:
+   - Static JSON configuration files, or
+   - Kubernetes Ingress resources (watching for changes in real-time)
+2. **Validates** the configuration for correctness
+3. **Translates** high-level routing rules into detailed Envoy proxy configurations
+4. **Serves** configurations to connected Envoy proxies via the xDS protocol
+5. **Automatically pushes updates** when configurations change (file updates or Ingress changes)
 
 Envoy proxies connect to the control plane and receive their routing configurations dynamically, eliminating the need for manual proxy configuration or restarts when routing rules change.
+
+**Kubernetes Mode:** When running in Kubernetes, the control plane watches Ingress resources and uses the LoadBalancer IPs to route traffic, effectively creating a second layer of routing that can span multiple ingress controllers or provide additional features.
 
 ## Signal Handling
 
@@ -138,4 +207,5 @@ This ensures zero-downtime deployments when integrated with orchestration platfo
 
 - Envoy proxy instances configured to connect to this control plane
 - Network connectivity between Envoy proxies and the control plane server
-- Valid JSON configuration file defining routing rules
+- Valid JSON configuration file (for static mode) or Kubernetes cluster with Ingress resources (for Kubernetes mode)
+- For Kubernetes deployment: RBAC permissions to watch Ingress resources (automatically configured by Helm chart)

@@ -42,7 +42,12 @@ spec:
             - run
             - --static-path=/etc/faraway-edge/config.json
             - --xds-port={{ .Values.service.port }}
-            - --token={{ .Values.xds_auth_token }}
+            - --token={{ .Values.xdsAuthToken }}
+            - --k8s-enabled={{ .Values.k8sDiscovery.enabled }}
+            - --k8s-cluster-name={{ .Values.k8sDiscovery.clusterName }}
+            {{- if .Values.k8sDiscovery.ingressClasses }}
+            - --k8s-ingress-classes={{ join "," .Values.k8sDiscovery.ingressClasses }}
+            {{- end }}
           env:
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

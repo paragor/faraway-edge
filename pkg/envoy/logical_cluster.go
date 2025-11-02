@@ -17,9 +17,6 @@ func (c *LogicalCluster) Validate() error {
 	if c.Name == "" {
 		return fmt.Errorf("cluster name is required")
 	}
-	if len(c.Ingresses) == 0 {
-		return fmt.Errorf("cluster %q: ingresses is required and must contain at least one ingress", c.Name)
-	}
 	for i, ingress := range c.Ingresses {
 		if ingress == nil {
 			return fmt.Errorf("cluster %q: ingresses[%d] is nil", c.Name, i)
