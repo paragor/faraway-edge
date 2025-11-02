@@ -78,11 +78,11 @@ resources: {}
 livenessProbe:
   httpGet:
     path: /healthz
-    port: http
+    port: diags
 readinessProbe:
   httpGet:
     path: /readyz
-    port: http
+    port: diags
 
 autoscaling:
   enabled: false
