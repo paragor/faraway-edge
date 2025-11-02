@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "faraway-edge.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "faraway-edge.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: 8080
+      targetPort: diags
+      protocol: TCP
+      name: diags
+  selector:
+    {{- include "faraway-edge.selectorLabels" . | nindent 4 }}

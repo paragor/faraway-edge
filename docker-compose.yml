@@ -1,0 +1,12 @@
+services:
+  envoy:
+    image: envoyproxy/envoy:v1.36.2          # 👈 всегда свежая версия Envoy
+    container_name: envoy-xds
+    ports:
+      - 9901:9901
+      - 8443:443
+      - 8080:80
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+    command: >
+      envoy -c /etc/envoy/envoy.yaml --log-level debug

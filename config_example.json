@@ -1,0 +1,30 @@
+{
+  "name": "static",
+  "ingresses": [
+    {
+      "name": "example",
+      "http_upstream": {
+        "port": 80,
+        "static_addresses": [
+          "10.10.10.10"
+        ],
+        "connect_timeout": "1s"
+      },
+      "https_upstream": {
+        "port": 443,
+        "static_addresses": [
+          "12.12.12.12"
+        ],
+        "connect_timeout": "1s"
+      },
+      "frontends": [
+        {
+          "domain": "first.example.com"
+        },
+        {
+          "domain": "second.example.com"
+        }
+      ]
+    }
+  ]
+}
