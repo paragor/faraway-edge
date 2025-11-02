@@ -132,7 +132,7 @@ Example:
 		// Start XDS server in background
 		xdsErrChan := make(chan error, 1)
 		go func() {
-			xdsErrChan <- xds.RunServer(ctx, time.Second*5)
+			xdsErrChan <- xds.RunServer(ctx, time.Second*30)
 		}()
 
 		// Wait a bit for XDS to start, then mark HTTP server as ready
